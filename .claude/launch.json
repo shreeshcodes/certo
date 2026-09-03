@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "certo-backend",
+      "runtimeExecutable": "/Users/michaelvanhorn16/Sites/certo/backend/.venv/bin/uvicorn",
+      "runtimeArgs": ["main:app", "--port", "8000"],
+      "cwd": "/Users/michaelvanhorn16/Sites/certo/backend",
+      "port": 8000
+    },
+    {
+      "name": "certo-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/michaelvanhorn16/Sites/certo/frontend",
+      "port": 3000
+    }
+  ]
+}
