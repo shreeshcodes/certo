@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
     if not store.list_events():
         if os.getenv("CERTO_SEED_MODE", "curated") == "extract":
             for b in SEED_BULLETINS:
-                events, _ = app.state.pipeline.extractor.run(b["jurisdiction"], b["agency"], b["raw_text"], b.get("published_date"))
+                events, _ = app.state.pipeline.extractor.run(b["jurisdiction"], b["agency"], b["raw_text"], b.get("published_date"), b.get("code_name"), b.get("source_url"))
                 store.upsert_events(events)
         else:
             store.upsert_events(SEED_EVENTS)
@@ -93,6 +93,7 @@ def _pipeline() -> CertoPipeline:
 def build_radar(gaps: List[ComplianceGap], events: List[RegulatoryEvent]) -> List[JurisdictionStatus]:
     crit: Dict[str, int] = defaultdict(int)
     warn: Dict[str, int] = defaultdict(int)
+    ok: Dict[str, int] = defaultdict(int)
     rules: Dict[str, int] = defaultdict(int)
     for e in events:
         rules[e.jurisdiction] += 1
@@ -101,6 +102,8 @@ def build_radar(gaps: List[ComplianceGap], events: List[RegulatoryEvent]) -> Lis
             crit[g.jurisdiction] += 1
         elif g.severity == "WARNING":
             warn[g.jurisdiction] += 1
+        else:
+            ok[g.jurisdiction] += 1
     radar = []
     for j in RADAR_STATES:
         if rules[j] == 0:
@@ -111,7 +114,7 @@ def build_radar(gaps: List[ComplianceGap], events: List[RegulatoryEvent]) -> Lis
             status = "AMBER"
         else:
             status = "GREEN"
-        radar.append(JurisdictionStatus(jurisdiction=j, status=status, critical_count=crit[j], warning_count=warn[j], active_rules=rules[j]))
+        radar.append(JurisdictionStatus(jurisdiction=j, status=status, critical_count=crit[j], warning_count=warn[j], compliant_count=ok[j], active_rules=rules[j]))
     return radar
 
 
@@ -159,7 +162,7 @@ def radar(document_id: str = SAMPLE_CONTRACT.document_id):
 
 @app.post("/api/ingest/statute", response_model=StatuteIngestResponse)
 def ingest_statute(req: StatuteIngestRequest):
-    events, mode = _pipeline().extractor.run(req.jurisdiction, req.agency, req.raw_text, req.published_date)
+    events, mode = _pipeline().extractor.run(req.jurisdiction, req.agency, req.raw_text, req.published_date, req.code_name, req.source_url)
     if not events:
         raise HTTPException(422, "No statutory rules with citations could be extracted from the bulletin text")
     _store().upsert_events(events)

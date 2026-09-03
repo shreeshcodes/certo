@@ -51,8 +51,21 @@ class MemoryStore:
         self.approvals: List[RemediationApproval] = []
 
     # events
+    @staticmethod
+    def _rule_key(e: RegulatoryEvent) -> Tuple[str, str, str]:
+        base = re.sub(r"\([a-z0-9\-]+\)", "", e.statute_citation.split(";")[0]).strip().lower()
+        return (e.jurisdiction, e.rule_type, base)
+
     def upsert_events(self, events: List[RegulatoryEvent]) -> None:
+        """Insert or replace. The same statute section ingested twice replaces
+        itself; a machine-extracted entry never displaces a curated one."""
         for e in events:
+            existing = next((x for x in self.events.values() if self._rule_key(x) == self._rule_key(e)), None)
+            if existing is not None:
+                if existing.verification.status != "UNVERIFIED" and e.verification.status == "UNVERIFIED":
+                    continue
+                self.events.pop(existing.event_id, None)
+                self.event_vectors.pop(existing.event_id, None)
             self.events[e.event_id] = e
             self.event_vectors[e.event_id] = embed(f"{e.statute_citation} {e.summary} {e.raw_source_snippet}")
 

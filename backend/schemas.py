@@ -16,28 +16,52 @@ def _utcnow() -> datetime:
 
 
 Jurisdiction = Literal["TX", "CA", "NY", "FED"]
-RuleType = Literal["FEE_CAP", "USURY_CAP", "DISCLOSURE_MANDATE", "REPORTING_DEADLINE"]
+RuleType = Literal["FEE_CAP", "USURY_CAP", "DISCLOSURE_MANDATE", "REPORTING_DEADLINE", "PREPAYMENT_PENALTY", "TERM_LIMIT"]
+ThresholdUnit = Literal["USD", "PERCENT_APR", "PERCENT_PER_MONTH", "PERCENT_OF_INSTALLMENT", "HOURS", "DAYS", "MONTHS"]
 Severity = Literal["CRITICAL", "WARNING", "COMPLIANT"]
+FeeKind = Literal["LATE", "NSF", "ADMIN", "ORIGINATION", "OTHER"]
+
+
+class FeeCapSpec(BaseModel):
+    """Structured statement of a statutory fee limit so the diff engine can
+    compare formulas ('greater of $15 or 5%') against caps ('5 cents per $1')."""
+
+    fee_kind: FeeKind = "LATE"
+    combinator: Literal["FLAT_USD", "FLAT_PCT", "LESSER_OF", "GREATER_OF", "PROHIBITED"] = "FLAT_PCT"
+    usd_max: Optional[float] = Field(None, description="Dollar ceiling, if any")
+    pct_max: Optional[float] = Field(None, description="Percent-of-installment ceiling, if any")
+    min_grace_days: Optional[int] = Field(None, description="Charge permitted only after this many days past due")
+    once_per_installment: bool = Field(True, description="Statute allows at most one charge per installment")
+
+
+class SourceVerification(BaseModel):
+    """Provenance record. ``verified_by`` is the human who checked it; it stays
+    empty until someone has. ``confidence`` is the machine check's confidence."""
+
+    status: Literal["MATCH", "MISMATCH", "PARTIAL", "UNVERIFIED"] = "UNVERIFIED"
+    confidence: float = Field(0.0, ge=0.0, le=1.0)
+    source_url: Optional[str] = None
+    machine_checked_at: Optional[str] = None
+    verified_by: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class RegulatoryEvent(BaseModel):
-    """A single structured statutory delta extracted from a bulletin."""
+    """A single structured statutory rule extracted from a bulletin or statute."""
 
     event_id: str = Field(description="Unique ID for the regulatory update")
     jurisdiction: Jurisdiction = Field(description="State or federal jurisdiction")
     agency: str = Field(description="Regulatory agency, e.g., Texas Department of Banking")
-    statute_citation: str = Field(description="Exact legal citation, e.g., TX Fin Code § 302.001")
+    statute_citation: str = Field(description="Exact legal citation, e.g., Tex. Fin. Code § 302.001(b)")
     effective_date: str = Field(description="ISO date when statute takes legal effect")
     rule_type: RuleType
-    summary: str = Field(description="Human-readable legal summary of the statutory delta")
-    raw_source_snippet: str = Field(description="Verbatim excerpt from the regulatory bulletin")
-    numerical_threshold: Optional[float] = Field(
-        None,
-        description="Extracted numerical cap, e.g., 15.00 for dollar cap or 16.0 for APR",
-    )
-    threshold_unit: Optional[Literal["USD", "PERCENT_APR", "PERCENT_OF_INSTALLMENT", "HOURS", "DAYS"]] = Field(
-        None, description="Unit of numerical_threshold so the diff engine can compare like with like"
-    )
+    summary: str = Field(description="Human-readable legal summary of the rule")
+    raw_source_snippet: str = Field(description="Verbatim excerpt from the statute or bulletin")
+    numerical_threshold: Optional[float] = Field(None, description="Binding number, e.g. 15.00 for a dollar cap or 16.0 for APR")
+    threshold_unit: Optional[ThresholdUnit] = Field(None, description="Unit of numerical_threshold so the diff engine compares like with like")
+    fee_cap: Optional[FeeCapSpec] = Field(None, description="Structured fee limit for FEE_CAP rules")
+    applicability: Optional[str] = Field(None, description="Scope limits, e.g. 'loans of $2,500 to $9,999' or 'residential homestead loans above 12%'")
+    verification: SourceVerification = Field(default_factory=SourceVerification)
 
     @field_validator("effective_date")
     @classmethod
@@ -52,6 +76,8 @@ class StatuteIngestRequest(BaseModel):
     bulletin_title: str
     raw_text: str = Field(min_length=20, description="Full text of the bulletin or statute excerpt")
     published_date: Optional[str] = None
+    code_name: Optional[str] = Field(None, description="Citation prefix for 'Sec. 342.203.' style headings, e.g. 'Tex. Fin. Code'")
+    source_url: Optional[str] = None
 
 
 class StatuteIngestResponse(BaseModel):
@@ -110,16 +136,12 @@ class ComplianceGap(BaseModel):
     is_grounded_in_citation: bool
     jurisdiction: Jurisdiction
     rule_type: RuleType
-    statutory_source_snippet: str = Field(
-        default="", description="Verbatim statute text shown beside the offending clause in the diff viewer"
-    )
+    statutory_source_snippet: str = Field(default="", description="Verbatim statute text shown beside the offending clause in the diff viewer")
 
 
 class AuditRequest(BaseModel):
     document: ContractDocument
-    jurisdictions: Optional[List[Jurisdiction]] = Field(
-        None, description="Restrict the audit to these jurisdictions; default is all ingested"
-    )
+    jurisdictions: Optional[List[Jurisdiction]] = Field(None, description="Restrict the audit to these jurisdictions; default is all ingested")
 
 
 class JurisdictionStatus(BaseModel):
@@ -127,6 +149,7 @@ class JurisdictionStatus(BaseModel):
     status: Literal["GREEN", "AMBER", "RED", "UNKNOWN"]
     critical_count: int
     warning_count: int
+    compliant_count: int = 0
     active_rules: int
 
 
@@ -175,9 +198,7 @@ class RemediationRequest(BaseModel):
     document_id: str
     auditor_id: str
     decision: Literal["APPROVE", "REJECT"] = "APPROVE"
-    auditor_override_text: Optional[str] = Field(
-        None, description="If the human edits the AI redline, the edited text wins"
-    )
+    auditor_override_text: Optional[str] = Field(None, description="If the human edits the AI redline, the edited text wins")
 
 
 class FilingPackage(BaseModel):
