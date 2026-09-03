@@ -1,7 +1,25 @@
 export type Jurisdiction = "TX" | "CA" | "NY" | "FED";
-export type RuleType = "FEE_CAP" | "USURY_CAP" | "DISCLOSURE_MANDATE" | "REPORTING_DEADLINE";
+export type RuleType = "FEE_CAP" | "USURY_CAP" | "DISCLOSURE_MANDATE" | "REPORTING_DEADLINE" | "PREPAYMENT_PENALTY" | "TERM_LIMIT";
 export type Severity = "CRITICAL" | "WARNING" | "COMPLIANT";
 export type RadarStatus = "GREEN" | "AMBER" | "RED" | "UNKNOWN";
+
+export interface FeeCapSpec {
+  fee_kind: "LATE" | "NSF" | "ADMIN" | "ORIGINATION" | "OTHER";
+  combinator: "FLAT_USD" | "FLAT_PCT" | "LESSER_OF" | "GREATER_OF" | "PROHIBITED";
+  usd_max: number | null;
+  pct_max: number | null;
+  min_grace_days: number | null;
+  once_per_installment: boolean;
+}
+
+export interface SourceVerification {
+  status: "MATCH" | "MISMATCH" | "PARTIAL" | "UNVERIFIED";
+  confidence: number;
+  source_url: string | null;
+  machine_checked_at: string | null;
+  verified_by: string | null;
+  notes: string | null;
+}
 
 export interface RegulatoryEvent {
   event_id: string;
@@ -14,6 +32,9 @@ export interface RegulatoryEvent {
   raw_source_snippet: string;
   numerical_threshold: number | null;
   threshold_unit: string | null;
+  fee_cap: FeeCapSpec | null;
+  applicability: string | null;
+  verification: SourceVerification;
 }
 
 export interface ContractClause {
@@ -27,6 +48,9 @@ export interface ContractDocument {
   title: string;
   jurisdiction: string;
   clauses: ContractClause[];
+  source_url: string | null;
+  source_type: string | null;
+  retrieved_at: string | null;
 }
 
 export interface ComplianceGap {
@@ -50,6 +74,7 @@ export interface JurisdictionStatus {
   status: RadarStatus;
   critical_count: number;
   warning_count: number;
+  compliant_count: number;
   active_rules: number;
 }
 

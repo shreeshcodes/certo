@@ -224,8 +224,16 @@ def _normalize_citation(raw: str) -> str:
     return raw
 
 
+def _is_heading(sentence: str) -> bool:
+    letters = [c for c in sentence if c.isalpha()]
+    return bool(letters) and len(sentence) < 90 and sum(c.isupper() for c in letters) / len(letters) > 0.7
+
+
 def _sentence_containing(para: str, needle: re.Pattern) -> str:
     sentences = re.split(r"(?<=[.;])\s+(?=[A-Z(])", para)
+    for s in sentences:
+        if needle.search(s) and not _is_heading(s):
+            return s.strip()
     for s in sentences:
         if needle.search(s):
             return s.strip()
@@ -286,6 +294,7 @@ def _fee_kind(text: str) -> Optional[FeeKind]:
     return None
 
 
+_LOAN_SIZE_RE = re.compile(r"((?:principal amount|loan)[^$]{0,60}?)(?:[a-z ,-]+dollars )?\(?\$\s?[\d,]+(?:\.\d+)?\)?", re.IGNORECASE)
 _FEE_SENTENCE_KEYS = {
     "LATE": r"late (?:charge|fee|payment charge)|delinquen|default charge|additional interest(?: for default)?|cents for each \$1|cents per dollar|not paid|past due|in default",
     "NSF": r"insufficient funds|returned|dishonored|nsf\b|failed automated withdrawal|processing fee",
@@ -308,7 +317,7 @@ def parse_fee_formula(text: str, kind: Optional[FeeKind] = None) -> Optional[Fee
     kind = kind or _fee_kind(text)
     if kind is None:
         return None
-    scope = _fee_sentences(text, kind)
+    scope = _LOAN_SIZE_RE.sub(lambda m: m.group(1), _fee_sentences(text, kind))
     if not scope:
         return FeeFormula(kind, "UNQUANTIFIED", None, None, None, False, False)
     low = scope.lower()
@@ -390,7 +399,7 @@ _INSTALLMENT_SIZES = (50.0, 100.0, 200.0, 300.0, 500.0, 1000.0, 2000.0)
 _RULE_KEYWORDS: Sequence[Tuple[RuleType, Tuple[str, ...]]] = (
     ("FEE_CAP", ("delinquency", "late charge", "late fee", "default charge", "additional interest for default", "administrative fee", "processing fee", "dishonored", "delinquency fee", "cents for each $1", "cents per dollar", "any interest or charge of any nature unless a loan is made")),
     ("PREPAYMENT_PENALTY", ("prepayment penalty", "prepay")),
-    ("TERM_LIMIT", ("term of the loan", "maximum term", "term that exceeds", "months and 15 days", "term of less than")),
+    ("TERM_LIMIT", ("term of the loan", "maximum term", "term that exceeds", "months and 15 days", "term of less than", "scheduled repayment of principal", "maximum loan term")),
     ("DISCLOSURE_MANDATE", ("disclos", "deliver to the borrower", "statement showing", "written notice", "opt-out", "shall disclose")),
     ("REPORTING_DEADLINE", ("report to", "annual report", "file with the commissioner", "reporting agency")),
     ("USURY_CAP", ("rate of interest", "interest", "per centum per annum", "ceiling", "usury", "usurious", "annual simple interest")),
@@ -583,7 +592,14 @@ class StatutoryDeltaExtractor:
         if rule_type == "FEE_CAP":
             low = para.lower()
             block_low = (block or para).lower()
-            kind: FeeKind = "NSF" if re.search(r"dishonored|returned|insufficient", low) else ("ADMIN" if "administrative fee" in low else "LATE")
+            if re.search(r"default charge|delinquen|late (?:charge|fee)|additional interest|cents for each \$1|cents per dollar", low):
+                kind: FeeKind = "LATE"
+            elif re.search(r"dishonored|returned|insufficient|processing fee", low):
+                kind = "NSF"
+            elif "administrative fee" in low:
+                kind = "ADMIN"
+            else:
+                kind = "LATE"
             prohibited = "unless a loan is made" in low
             formula = parse_fee_formula(para, kind)
             cap_sentence = _sentence_containing(para, re.compile(r"may not exceed|not to exceed|not in excess of|not exceeding|maximum|greater of|lesser of|unless a loan is made", re.IGNORECASE))
@@ -766,7 +782,8 @@ class GapAnalysisEngine:
             if re.search(r"(?i)whether or not (?:a|the) loan is (?:made|funded)|application fee|regardless of whether", text):
                 return self._gap(document, clause, event, severity="CRITICAL", reason=f"Clause charges a fee whether or not a loan is made, contrary to {event.statute_citation}.", threshold="no charge unless a loan is made", patch=self._prohibited_fee_patch(text, event), confidence=0.9)
             return None
-        if kind != spec.fee_kind:
+        equivalent = {kind, "ADMIN" if kind == "ORIGINATION" else kind, "ORIGINATION" if kind == "ADMIN" else kind}
+        if spec.fee_kind not in equivalent:
             return None
         formula = parse_fee_formula(text, kind)
         cap_txt = describe_cap(spec)
@@ -814,7 +831,7 @@ class GapAnalysisEngine:
             return self._gap(document, clause, event, severity="CRITICAL", reason=f"Automatic enrollment in an optional product without the notice and opt-out window required by {event.statute_citation}.", threshold=f"{event.numerical_threshold:g}-hour opt-out window" if event.numerical_threshold else "written opt-out notice", patch=self._disclosure_patch(text, event), confidence=0.9)
         if "license number" in snippet_low or "annual percentage rate" in snippet_low:
             # CA § 22337(a): the note itself must carry or be accompanied by the statement; check the preamble / rate clause.
-            if not re.search(r"promise to pay|principal sum|bears interest", low):
+            if not re.search(r"promises? to pay", low):
                 return None
             has_license = "license" in low
             has_apr = "annual percentage rate" in low or "truth in lending" in low
@@ -844,7 +861,7 @@ class GapAnalysisEngine:
         if penalty:
             pcts = _percents(text)
             return self._gap(document, clause, event, severity="CRITICAL", reason=f"Clause imposes a prepayment penalty" + (f" of {pcts[0]:g}%" if pcts else "") + f", which {event.statute_citation} prohibits" + (f" for {event.applicability}" if event.applicability else "") + ".", threshold="no prepayment penalty", patch=self._prepayment_patch(text, event), confidence=0.9)
-        if re.search(r"without penalty|without penalty or premium|no penalty", low):
+        if re.search(r"without penalty|without penalty or premium|no penalty", low) and "prepay" in clause.section_name.lower():
             return self._gap(document, clause, event, severity="COMPLIANT", reason=f"Borrower may prepay without penalty, consistent with {event.statute_citation}.", threshold="no prepayment penalty", patch=text, confidence=0.9)
         return None
 

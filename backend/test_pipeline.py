@@ -29,6 +29,16 @@ def test_parser_finds_fee_clauses_in_both_notes():
     assert "Controlling Law · New Jersey Residents" in happen
 
 
+def test_seed_has_fifteen_events_across_three_states():
+    assert len(SEED_EVENTS) == 15
+    by_state = {}
+    for e in SEED_EVENTS:
+        by_state.setdefault(e.jurisdiction, set()).add(e.rule_type)
+    assert by_state["TX"] >= {"USURY_CAP", "FEE_CAP", "PREPAYMENT_PENALTY"}
+    assert by_state["CA"] >= {"USURY_CAP", "FEE_CAP", "TERM_LIMIT", "DISCLOSURE_MANDATE"}
+    assert by_state["NY"] >= {"USURY_CAP", "FEE_CAP"}
+
+
 def test_every_seed_event_has_provenance_and_no_human_verifier():
     for e in SEED_EVENTS:
         assert e.verification.source_url and e.verification.source_url.startswith("https://")
@@ -55,8 +65,21 @@ def test_extractor_reads_real_statute_text():
         assert found["Cal. Fin. Code § 22304.5"]["numerical_threshold"] == 36.0
         assert found["Cal. Fin. Code § 22300"]["fee_cap"]["combinator"] == "PROHIBITED"
         assert found["N.Y. Banking Law § 14-a"]["numerical_threshold"] == 16.0
-        # re-ingesting a curated section does not duplicate it
-        assert len(c.get("/api/events").json()) == len(SEED_EVENTS) + 1  # + § 302.001(d), which is not in the curated set yet
+        assert found["Tex. Fin. Code § 303.009(b)"]["numerical_threshold"] == 24.0
+        assert found["Tex. Fin. Code § 302.102"]["rule_type"] == "PREPAYMENT_PENALTY"
+        assert found["Tex. Bus. & Com. Code § 3.506(b)"]["fee_cap"]["usd_max"] == 30.0
+        ca = found["Cal. Fin. Code § 22320.5(a)"]["fee_cap"]
+        assert (ca["combinator"], ca["usd_max"], ca["min_grace_days"], ca["once_per_installment"]) == ("FLAT_USD", 15.0, 10, True)
+        assert found["Cal. Fin. Code § 22334(c)"]["numerical_threshold"] == 12.0
+        assert found["N.Y. Penal Law § 190.40"]["numerical_threshold"] == 25.0
+        ny = found["N.Y. Banking Law § 351"]["fee_cap"]
+        assert (ny["combinator"], ny["pct_max"], ny["once_per_installment"]) == ("FLAT_PCT", 5.0, True)
+        # re-ingesting curated sections replaces nothing curated and creates no duplicate section keys
+        after = c.get("/api/events").json()
+        ids = {e["event_id"] for e in after}
+        assert {e.event_id for e in SEED_EVENTS} <= ids
+        keys = [(e["jurisdiction"], e["rule_type"], re.sub(r"\([a-z0-9\-]+\)", "", e["statute_citation"].split(";")[0]).strip().lower()) for e in after]
+        assert len(keys) == len(set(keys))
 
 
 def test_end_to_end_offline():
@@ -69,12 +92,22 @@ def test_end_to_end_offline():
         assert r.status_code == 200, r.text
         body = r.json()
         radar = {s["jurisdiction"]: s["status"] for s in body["radar"]}
-        assert radar == {"TX": "RED", "CA": "AMBER", "NY": "AMBER"}
+        assert radar == {"TX": "RED", "CA": "RED", "NY": "RED"}
+        crit = {(g["jurisdiction"], g["statute_citation"]) for g in body["gaps"] if g["severity"] == "CRITICAL"}
+        assert crit == {
+            ("TX", "Tex. Fin. Code § 342.203(d)"),
+            ("TX", "Tex. Fin. Code § 302.001(d)"),
+            ("CA", "Cal. Fin. Code § 22320.5(a)-(b)"),
+            ("NY", "N.Y. Banking Law § 351"),
+        }
+        assert all(g["target_clause_id"] == "cl-5" for g in body["gaps"] if g["severity"] == "CRITICAL")
         late = [g for g in body["gaps"] if g["target_clause_id"] == "cl-5" and g["statute_citation"] == "Tex. Fin. Code § 342.203(d)"]
-        assert late and late[0]["severity"] == "CRITICAL"
         assert "$2.50" in late[0]["violation_reason"]  # 5% of a $50 installment
-        blanks = [g for g in body["gaps"] if g["target_clause_id"] == "cl-2"]
-        assert {g["severity"] for g in blanks} == {"WARNING"} and len(blanks) == 3
+        blanks = [g for g in body["gaps"] if g["target_clause_id"] == "cl-2" and "blank" in g["violation_reason"]]
+        assert {g["severity"] for g in blanks} == {"WARNING"} and len(blanks) == 5
+        passed = {(g["statute_citation"], g["target_clause_id"]) for g in body["gaps"] if g["severity"] == "COMPLIANT"}
+        assert ("Tex. Fin. Code § 302.102", "cl-10") in passed  # prepay without penalty
+        assert any(c == "cl-12" for _, c in passed)  # $15 NSF fee within the $30 Texas cap
         assert all(g["is_grounded_in_citation"] for g in body["gaps"])
 
         gap = late[0]
@@ -97,6 +130,16 @@ def test_end_to_end_offline():
         gap2 = [g for g in r.json()["gaps"] if g["severity"] == "CRITICAL"][0]
         r = c.post("/api/remediate/patch", json={"gap_id": gap2["gap_id"], "document_id": SAMPLE_CONTRACT.document_id, "auditor_id": "bryce", "auditor_override_text": "Late charge shall be $99 or 40% of the payment."})
         assert r.status_code == 422
+
+
+def test_happen_note_audit():
+    with TestClient(app) as c:
+        body = c.post("/api/audit/document", json={"document": HAPPEN_CONTRACT.model_dump()}).json()
+        crit = {(g["jurisdiction"], g["target_clause_id"]) for g in body["gaps"] if g["severity"] == "CRITICAL"}
+        assert crit == {("TX", "cl-7"), ("CA", "cl-7"), ("NY", "cl-7")}
+        warn = {(g["statute_citation"], g["target_clause_id"]) for g in body["gaps"] if g["severity"] == "WARNING"}
+        assert ("Cal. Fin. Code § 22305", "cl-5") in warn  # origination fee amount unstated vs $75 cap
+        assert ("Cal. Fin. Code § 22334(c)", "cl-4") in warn  # blank term vs 12-month minimum
 
 
 def test_parse_endpoint():

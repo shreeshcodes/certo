@@ -18,6 +18,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<{ status: string; mode: string; events: number; store: string }>("/api/health"),
   events: () => request<RegulatoryEvent[]>("/api/events"),
+  documents: () => request<ContractDocument[]>("/api/documents"),
   sampleDocument: () => request<ContractDocument>("/api/documents/sample"),
   audit: (document: ContractDocument) =>
     request<AuditResponse>("/api/audit/document", { method: "POST", body: JSON.stringify({ document }) }),

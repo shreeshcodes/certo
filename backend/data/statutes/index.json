@@ -1,0 +1,115 @@
+{
+  "ca-fin-22300": {
+    "source_url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=FIN&sectionNum=22300.",
+    "retrieved_at": "2026-09-03T03:02:48+00:00",
+    "sha256": "6aacc5b85346452aa12256600bde0a10b02e77332ed23cbbf1a6c84f0cc75761",
+    "chars": 141
+  },
+  "ca-fin-22304-5": {
+    "source_url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=FIN&sectionNum=22304.5.",
+    "retrieved_at": "2026-09-03T03:02:48+00:00",
+    "sha256": "70d9521b1ffa674b3bc8ec945bd69adf298d67c98569edc4b68daf02c30dc608",
+    "chars": 3882
+  },
+  "ca-fin-22305": {
+    "source_url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=FIN&sectionNum=22305.",
+    "retrieved_at": "2026-09-03T03:02:48+00:00",
+    "sha256": "5c18c74e2e0543879ff0b1f60ef62f443df06ae047e9858d0e3e36aa70a4f3e8",
+    "chars": 1061
+  },
+  "ca-fin-22320-5": {
+    "source_url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=FIN&sectionNum=22320.5.",
+    "retrieved_at": "2026-09-03T03:02:48+00:00",
+    "sha256": "e4b0505605531b55df12156f8c8ebb75c8660236e9035cff5a403e0d502a90d7",
+    "chars": 1310
+  },
+  "ca-fin-22334": {
+    "source_url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=FIN&sectionNum=22334.",
+    "retrieved_at": "2026-09-03T03:02:48+00:00",
+    "sha256": "b05293eae7445b339d5cb468c2eb96be3790c61ca6436e760fbcb32243ccf063",
+    "chars": 1343
+  },
+  "ca-fin-22337": {
+    "source_url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=FIN&sectionNum=22337.",
+    "retrieved_at": "2026-09-03T03:02:48+00:00",
+    "sha256": "57f81585dfa9b562836a52a5e282a59b86eb93833cc1d715d53135c729e96f02",
+    "chars": 4018
+  },
+  "ny-bnk-14-a": {
+    "source_url": "https://www.nysenate.gov/legislation/laws/BNK/14-A",
+    "retrieved_at": "2026-09-03T03:06:27+00:00",
+    "sha256": "91383f7c1b89497a26be6fa332875f3a03eae5357faa1bcfe062c155af25036d",
+    "chars": 217,
+    "note": "Excerpt. nysenate.gov serves a JavaScript challenge to non-browser clients; these sentences were retrieved verbatim through a fetch on 2026-09-03 and are excerpts, not the full section."
+  },
+  "ny-gob-5-501": {
+    "source_url": "https://www.nysenate.gov/legislation/laws/GOB/5-501",
+    "retrieved_at": "2026-09-03T03:06:27+00:00",
+    "sha256": "2fc32abb9a02af50ac4cce05558e587343fcfc8402ec2d765e532ddc87db8edf",
+    "chars": 1564,
+    "note": "Excerpt. nysenate.gov serves a JavaScript challenge to non-browser clients; these sentences were retrieved verbatim through a fetch on 2026-09-03 and are excerpts, not the full section."
+  },
+  "ny-pen-190-40": {
+    "source_url": "https://www.nysenate.gov/legislation/laws/PEN/190.40",
+    "retrieved_at": "2026-09-03T03:06:27+00:00",
+    "sha256": "c4cfa6bf3e2f5ebd5e1a9f079424d4bd5f00e36fd4de01e67c2b8aa64ea250a1",
+    "chars": 466,
+    "note": "Excerpt. nysenate.gov serves a JavaScript challenge to non-browser clients; these sentences were retrieved verbatim through a fetch on 2026-09-03 and are excerpts, not the full section."
+  },
+  "ny-bnk-351": {
+    "source_url": "https://www.nysenate.gov/legislation/laws/BNK/351",
+    "retrieved_at": "2026-09-03T03:06:27+00:00",
+    "sha256": "789f76f0df95c6998ec6fc3fd4729d367756742e9081aca03e5969a91a826741",
+    "chars": 630,
+    "note": "Excerpt. nysenate.gov serves a JavaScript challenge to non-browser clients; these sentences were retrieved verbatim through a fetch on 2026-09-03 and are excerpts, not the full section."
+  },
+  "ny-bnk-108": {
+    "source_url": "https://www.nysenate.gov/legislation/laws/BNK/108",
+    "retrieved_at": "2026-09-03T03:06:27+00:00",
+    "sha256": "552cd1a75b25cdc6238875c8de4725ce735d7872f2742d78903756f7bdba8f22",
+    "chars": 1145,
+    "note": "Excerpt. nysenate.gov serves a JavaScript challenge to non-browser clients; these sentences were retrieved verbatim through a fetch on 2026-09-03 and are excerpts, not the full section."
+  },
+  "tx-fin-302-001": {
+    "source_url": "https://statutes.capitol.texas.gov/Docs/FI/htm/FI.302.htm#302.001",
+    "retrieved_at": "2026-09-03T02:30:00+00:00",
+    "sha256": "8bb92fc4eec084823a2fe9e11ecd9989d111b42b9870c38f917dfba313890f91",
+    "chars": 1346,
+    "note": "Captured verbatim from the rendered page DOM of statutes.capitol.texas.gov (the site is a JavaScript application) on 2026-09-03; subsection (c) of \u00a7 3.506 omitted as irrelevant to lending."
+  },
+  "tx-fin-302-102": {
+    "source_url": "https://statutes.capitol.texas.gov/Docs/FI/htm/FI.302.htm#302.102",
+    "retrieved_at": "2026-09-03T02:30:00+00:00",
+    "sha256": "685f3bd257dfbe80422958e3c36d67b0fc030b7c14e5ab5adb85470c4ada0be6",
+    "chars": 449,
+    "note": "Captured verbatim from the rendered page DOM of statutes.capitol.texas.gov (the site is a JavaScript application) on 2026-09-03; subsection (c) of \u00a7 3.506 omitted as irrelevant to lending."
+  },
+  "tx-fin-303-009": {
+    "source_url": "https://statutes.capitol.texas.gov/Docs/FI/htm/FI.303.htm#303.009",
+    "retrieved_at": "2026-09-03T02:30:00+00:00",
+    "sha256": "3b3505b9ac0e8758613228634f08bc6d67d4f05f8ca7239ccb1c5d429ba99a66",
+    "chars": 1485,
+    "note": "Captured verbatim from the rendered page DOM of statutes.capitol.texas.gov (the site is a JavaScript application) on 2026-09-03; subsection (c) of \u00a7 3.506 omitted as irrelevant to lending."
+  },
+  "tx-fin-342-203": {
+    "source_url": "https://statutes.capitol.texas.gov/Docs/FI/htm/FI.342.htm#342.203",
+    "retrieved_at": "2026-09-03T02:30:00+00:00",
+    "sha256": "a996787855623004f47764a5159b0478e8606d5c0f89e72116f25ecee05087a2",
+    "chars": 1359,
+    "note": "Captured verbatim from the rendered page DOM of statutes.capitol.texas.gov (the site is a JavaScript application) on 2026-09-03; subsection (c) of \u00a7 3.506 omitted as irrelevant to lending."
+  },
+  "tx-fin-342-502": {
+    "source_url": "https://statutes.capitol.texas.gov/Docs/FI/htm/FI.342.htm#342.502",
+    "retrieved_at": "2026-09-03T02:30:00+00:00",
+    "sha256": "5834b3e53cdd6cf5c4bdc0097965955e0ec0a8c15e3e4d82adf9425b06fb3c28",
+    "chars": 1545,
+    "note": "Captured verbatim from the rendered page DOM of statutes.capitol.texas.gov (the site is a JavaScript application) on 2026-09-03; subsection (c) of \u00a7 3.506 omitted as irrelevant to lending."
+  },
+  "tx-bc-3-506": {
+    "source_url": "https://statutes.capitol.texas.gov/Docs/BC/htm/BC.3.htm#3.506",
+    "retrieved_at": "2026-09-03T02:30:00+00:00",
+    "sha256": "5369db29a2a449454c2bc0ab0c9098b29857534659d17e0674ff8e342acd66ff",
+    "chars": 1024,
+    "note": "Captured verbatim from the rendered page DOM of statutes.capitol.texas.gov (the site is a JavaScript application) on 2026-09-03; subsection (c) of \u00a7 3.506 omitted as irrelevant to lending."
+  }
+}
