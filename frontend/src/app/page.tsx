@@ -160,7 +160,9 @@ export default function Dashboard() {
       setMode(res.analysis_mode);
       setSelectedGapId((prev) => {
         const open = res.gaps.filter((g) => g.severity !== "COMPLIANT");
-        return prev && open.some((g) => g.gap_id === prev) ? prev : open[0]?.gap_id ?? null;
+        if (prev && open.some((g) => g.gap_id === prev)) return prev;
+        const first = open.find((g) => g.severity === "CRITICAL") ?? open[0];
+        return first?.gap_id ?? null;
       });
       setPatch(null);
       setOverride("");
@@ -200,7 +202,10 @@ export default function Dashboard() {
 
   const allGaps = audit?.gaps ?? [];
   const gaps = useMemo(() => {
-    const open = allGaps.filter((g) => g.severity !== "COMPLIANT");
+    const rank = { CRITICAL: 0, WARNING: 1, COMPLIANT: 2 } as const;
+    const open = allGaps
+      .filter((g) => g.severity !== "COMPLIANT")
+      .sort((a, b) => rank[a.severity] - rank[b.severity] || a.jurisdiction.localeCompare(b.jurisdiction) || a.target_clause_id.localeCompare(b.target_clause_id));
     return stateFilter ? open.filter((g) => g.jurisdiction === stateFilter) : open;
   }, [allGaps, stateFilter]);
   const passed = useMemo(() => {

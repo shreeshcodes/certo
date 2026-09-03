@@ -12,3 +12,6 @@ frontend/*.tsbuildinfo
 .env
 .env.local
 .DS_Store
+
+# demo runtime
+.demo/
