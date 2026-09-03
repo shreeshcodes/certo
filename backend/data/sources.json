@@ -1,0 +1,20 @@
+{
+  "prosper_webbank_promissory_note_2016.txt": {
+    "title": "Prosper Funding LLC / WebBank Promissory Note (Exhibit A to Borrower Registration Agreement)",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1416265/000156459016015019/prosper-ex1022_926.htm",
+    "source_type": "SEC EDGAR exhibit 10.22, Prosper Funding LLC (CIK 1416265), filed 2016",
+    "document_date": "2016-03",
+    "retrieved_at": "2026-09-03T02:48:02+00:00",
+    "extraction": "HTML converted to text with block-level tags as line breaks; the recurring '10.22' exhibit page footer was removed; no words were changed.",
+    "sha256": "6c8d8239abe81a0cc3c077876513dddd08b45b38523f44b85bdf490a7ef24c7c"
+  },
+  "happen_bank_loan_agreement_2026.txt": {
+    "title": "Happen Bank, N.A. (formerly LendingClub) Loan Agreement and Promissory Note (Exhibit A to Borrower Agreement)",
+    "source_url": "https://www.lendingclub.com/apply/personal/legal-agreement/PersonalBorrowerAgreement",
+    "source_type": "Lender legal page (301 redirects to happen.com); Borrower Agreement last updated 2026-08-21",
+    "document_date": "2026-08-21",
+    "retrieved_at": "2026-09-03T02:48:02+00:00",
+    "extraction": "HTML converted to text with block-level tags as line breaks; no words were changed.",
+    "sha256": "a53de346e68f70581321e35f282542062ea45d64f043e0deada4c14a574396af"
+  }
+}

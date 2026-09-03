@@ -83,6 +83,9 @@ class MemoryStore:
     def get_document(self, document_id: str) -> Optional[ContractDocument]:
         return self.documents.get(document_id)
 
+    def list_documents(self) -> List[ContractDocument]:
+        return list(self.documents.values())
+
     def replace_gaps(self, document_id: str, gaps: List[ComplianceGap]) -> None:
         for gid in [g for g, v in self.gaps.items() if v.gap_id.startswith("gap-") and self._gap_doc(v) == document_id]:
             self.gaps.pop(gid, None)

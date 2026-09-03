@@ -414,7 +414,7 @@ class GapAnalysisEngine:
                 severity="CRITICAL",
                 reason=f"Under {event.statute_citation}: " + "; ".join(reasons) + ".",
                 threshold=f"lesser of ${event.numerical_threshold:.2f} or 5% of the unpaid installment, once per installment",
-                patch=self._fee_patch(event),
+                patch=self._fee_patch(text, event),
                 confidence=0.98,
             )
         if event.rule_type == "DISCLOSURE_MANDATE":
@@ -479,13 +479,17 @@ class GapAnalysisEngine:
         )
 
     @staticmethod
-    def _fee_patch(event: RegulatoryEvent) -> str:
-        return (
-            f"If any installment is not paid within ten (10) days after its due date, Borrower shall pay a single "
-            f"delinquency charge equal to the lesser of ${event.numerical_threshold:.2f} or five percent (5%) of the "
-            f"unpaid amount of the installment, as permitted by {event.statute_citation}. Only one delinquency "
-            f"charge may be collected on any one installment."
-        )
+    def _fee_patch(text: str, event: RegulatoryEvent) -> str:
+        """Rewrite the offending formula in place rather than appending an
+        override, so the corrected clause re-audits clean."""
+        cap = event.numerical_threshold if event.numerical_threshold is not None else 15.0
+        patched = re.sub(r"(?i)\bgreater of\b", "lesser of", text)
+        patched = _USD_RE.sub(lambda m: f"${cap:.2f}" if float(m.group(1).replace(",", "")) > cap else m.group(0), patched)
+        patched = _PCT_RE.sub(lambda m: "five percent (5%)" if float(m.group(1)) > 5.0 else m.group(0), patched)
+        patched = re.sub(r"(?i)[^.]*\b(?:each|per) month\b[^.]*\.", "", patched).strip()
+        if not re.search(r"(?i)only (?:one|once)", patched):
+            patched += " Only one such charge may be collected on any one installment."
+        return f"{patched} This charge is limited as required by {event.statute_citation}."
 
     @staticmethod
     def _disclosure_patch(text: str, event: RegulatoryEvent) -> str:

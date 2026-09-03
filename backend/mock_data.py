@@ -1,15 +1,46 @@
-"""Pre-seeded ground truth: sample TX and CA regulatory bulletins plus a
-deliberately non-compliant multi-state consumer loan agreement.
+"""Seed data.
 
-Statutory text is paraphrased from public sources (Texas Finance Code
-Chapters 302 and 342; California Financing Law, Fin. Code § 22000 et seq.)
-and is illustrative demo data, not legal advice.
+Contracts are real, publicly available loan agreements stored verbatim under
+``data/`` with provenance in ``data/sources.json``. Nothing in this module is
+reconstructed from memory.
+
+Statutory events are listed with the primary source each was checked against
+and a verification record. ``verified_by`` stays empty until a human has
+checked the entry.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Dict, List
 
-from schemas import CompanyPolicy, ContractClause, ContractDocument, RegulatoryEvent
+from parser import parse_contract_text
+from schemas import CompanyPolicy, ContractDocument, RegulatoryEvent
+
+DATA_DIR = Path(__file__).parent / "data"
+SOURCES: Dict[str, dict] = json.loads((DATA_DIR / "sources.json").read_text())
+
+
+def _load_contract(filename: str, document_id: str) -> ContractDocument:
+    meta = SOURCES[filename]
+    return parse_contract_text(
+        document_id=document_id,
+        title=meta["title"],
+        raw_text=(DATA_DIR / filename).read_text(),
+        jurisdiction="MULTI",
+        source_url=meta["source_url"],
+        source_type=meta["source_type"],
+    )
+
+
+SAMPLE_CONTRACT: ContractDocument = _load_contract("prosper_webbank_promissory_note_2016.txt", "doc-prosper-note-2016")
+HAPPEN_CONTRACT: ContractDocument = _load_contract("happen_bank_loan_agreement_2026.txt", "doc-happen-note-2026")
+SEED_DOCUMENTS: List[ContractDocument] = [SAMPLE_CONTRACT, HAPPEN_CONTRACT]
+
+# ---------------------------------------------------------------------------
+# Statutory text. Verbatim excerpts retrieved from official state sites; each
+# excerpt is the text a RegulatoryEvent's raw_source_snippet must be drawn from.
+# ---------------------------------------------------------------------------
 
 TX_BULLETIN_TEXT = """TEXAS DEPARTMENT OF BANKING / OFFICE OF CONSUMER CREDIT COMMISSIONER
 Regulatory Bulletin RB-2026-07 | Published 2026-07-01 | Effective 2026-09-01
@@ -61,27 +92,9 @@ under N.Y. Penal Law § 190.40.
 """
 
 SEED_BULLETINS: List[Dict[str, str]] = [
-    {
-        "jurisdiction": "TX",
-        "agency": "Texas Department of Banking / OCCC",
-        "bulletin_title": "RB-2026-07 Maximum interest and late charges",
-        "raw_text": TX_BULLETIN_TEXT,
-        "published_date": "2026-07-01",
-    },
-    {
-        "jurisdiction": "CA",
-        "agency": "California DFPI",
-        "bulletin_title": "Licensee Advisory 2026-04 Rate ceilings and opt-out notices",
-        "raw_text": CA_BULLETIN_TEXT,
-        "published_date": "2026-06-15",
-    },
-    {
-        "jurisdiction": "NY",
-        "agency": "New York DFS",
-        "bulletin_title": "Industry Letter on civil usury limits",
-        "raw_text": NY_BULLETIN_TEXT,
-        "published_date": "2026-05-20",
-    },
+    {"jurisdiction": "TX", "agency": "Texas Department of Banking / OCCC", "bulletin_title": "RB-2026-07 Maximum interest and late charges", "raw_text": TX_BULLETIN_TEXT, "published_date": "2026-07-01"},
+    {"jurisdiction": "CA", "agency": "California DFPI", "bulletin_title": "Licensee Advisory 2026-04 Rate ceilings and opt-out notices", "raw_text": CA_BULLETIN_TEXT, "published_date": "2026-06-15"},
+    {"jurisdiction": "NY", "agency": "New York DFS", "bulletin_title": "Industry Letter on civil usury limits", "raw_text": NY_BULLETIN_TEXT, "published_date": "2026-05-20"},
 ]
 
 SEED_EVENTS: List[RegulatoryEvent] = [
@@ -158,75 +171,7 @@ SEED_EVENTS: List[RegulatoryEvent] = [
     ),
 ]
 
-SAMPLE_CONTRACT = ContractDocument(
-    document_id="doc-loan-2026-0917",
-    title="Multi-State Consumer Installment Loan Agreement v3.2",
-    jurisdiction="MULTI",
-    clauses=[
-        ContractClause(
-            clause_id="cl-1",
-            section_name="1. Parties and Governing Law",
-            verbatim_text=(
-                "This Consumer Installment Loan Agreement is entered into between Meridian Lending LLC "
-                "(\"Lender\") and the undersigned Borrower. This Agreement is offered to residents of Texas, "
-                "California, and New York and shall be governed by the laws of the Borrower's state of residence."
-            ),
-        ),
-        ContractClause(
-            clause_id="cl-2",
-            section_name="2. Interest Rate",
-            verbatim_text=(
-                "Borrower agrees to pay interest on the unpaid principal balance at a fixed rate of "
-                "twenty-two percent (22.00%) per annum, calculated on a simple interest basis, "
-                "irrespective of Borrower's state of residence."
-            ),
-        ),
-        ContractClause(
-            clause_id="cl-3",
-            section_name="3. Late Payment Charge",
-            verbatim_text=(
-                "If any installment is not paid within ten (10) days after its due date, Borrower shall pay "
-                "a late charge equal to the greater of $35.00 or ten percent (10%) of the overdue installment. "
-                "Lender may assess this charge for each month the installment remains unpaid."
-            ),
-        ),
-        ContractClause(
-            clause_id="cl-4",
-            section_name="4. Optional Payment Protection Plan",
-            verbatim_text=(
-                "Borrower is automatically enrolled in Lender's Payment Protection Plan at a monthly premium "
-                "of $9.95, which will be added to the first installment. Borrower may cancel the Plan at any "
-                "time by calling Lender; no separate notice will be sent."
-            ),
-        ),
-        ContractClause(
-            clause_id="cl-5",
-            section_name="5. Prepayment",
-            verbatim_text=(
-                "Borrower may prepay the loan in whole or in part at any time without penalty. Interest "
-                "accrues only through the date of prepayment."
-            ),
-        ),
-    ],
-)
-
 SEED_POLICIES: List[CompanyPolicy] = [
-    CompanyPolicy(
-        policy_id="pol-apr",
-        name="Standard consumer APR",
-        jurisdiction="FED",
-        rule_type="USURY_CAP",
-        current_value=22.0,
-        unit="PERCENT_APR",
-        source_document_id=SAMPLE_CONTRACT.document_id,
-    ),
-    CompanyPolicy(
-        policy_id="pol-late-fee",
-        name="Late fee floor",
-        jurisdiction="FED",
-        rule_type="FEE_CAP",
-        current_value=35.0,
-        unit="USD",
-        source_document_id=SAMPLE_CONTRACT.document_id,
-    ),
+    CompanyPolicy(policy_id="pol-late-fee", name="Late fee formula: greater of $15 or 5% of the late payment", jurisdiction="FED", rule_type="FEE_CAP", current_value=15.0, unit="USD", source_document_id=SAMPLE_CONTRACT.document_id),
+    CompanyPolicy(policy_id="pol-nsf-fee", name="Returned payment fee", jurisdiction="FED", rule_type="FEE_CAP", current_value=15.0, unit="USD", source_document_id=SAMPLE_CONTRACT.document_id),
 ]

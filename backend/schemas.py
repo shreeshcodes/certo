@@ -66,11 +66,23 @@ class ContractClause(BaseModel):
     verbatim_text: str
 
 
+class ParseContractRequest(BaseModel):
+    document_id: str
+    title: str
+    raw_text: str = Field(min_length=50)
+    jurisdiction: str = "MULTI"
+    source_url: Optional[str] = None
+    source_type: Optional[str] = None
+
+
 class ContractDocument(BaseModel):
     document_id: str
     title: str
     jurisdiction: str
     clauses: List[ContractClause]
+    source_url: Optional[str] = Field(None, description="Where the verbatim text was retrieved from")
+    source_type: Optional[str] = Field(None, description="e.g. SEC EDGAR exhibit, lender legal page")
+    retrieved_at: Optional[str] = Field(None, description="ISO timestamp of retrieval")
 
 
 class CompanyPolicy(BaseModel):

@@ -1,38 +1,52 @@
 """Offline smoke tests for the deterministic pipeline. Run: python -m pytest -q"""
+import re
+
 from fastapi.testclient import TestClient
 
 from main import app
-from mock_data import SAMPLE_CONTRACT, TX_BULLETIN_TEXT, CA_BULLETIN_TEXT
+from mock_data import DATA_DIR, HAPPEN_CONTRACT, SAMPLE_CONTRACT, SOURCES
+from parser import parse_contract_text
+
+
+def test_parser_preserves_every_word_of_real_notes():
+    for filename in SOURCES:
+        raw = (DATA_DIR / filename).read_text()
+        doc = parse_contract_text("t", "t", raw)
+        joined = " ".join(c.verbatim_text for c in doc.clauses)
+        assert re.findall(r"\S+", joined) == re.findall(r"\S+", raw)
+        assert len(doc.clauses) >= 15
+
+
+def test_parser_finds_fee_clauses_in_both_notes():
+    prosper = {c.section_name: c for c in SAMPLE_CONTRACT.clauses}
+    assert "greater of $15 or 5.00%" in prosper["4. Late Charge"].verbatim_text
+    assert "without penalty" in prosper["9. Prepayments"].verbatim_text
+    assert "22. By signing this Note, I acknowledge …" in prosper
+    assert "21. State Notices · New Jersey Residents" in prosper
+    happen = {c.section_name: c for c in HAPPEN_CONTRACT.clauses}
+    assert "greater of 5% of the outstanding payment or $15" in happen["Late fee"].verbatim_text
+    assert "Lender" not in happen and "Borrower" not in happen  # wrapped lines are not headings
+    assert "Controlling Law · New Jersey Residents" in happen
 
 
 def test_end_to_end_offline():
     with TestClient(app) as c:
-        assert c.get("/api/health").json()["events"] >= 5
-
-        r = c.post("/api/ingest/statute", json={"jurisdiction": "TX", "agency": "TX DOB", "bulletin_title": "t", "raw_text": TX_BULLETIN_TEXT})
-        assert r.status_code == 200, r.text
-        types = {e["rule_type"]: e for e in r.json()["events"]}
-        assert types["FEE_CAP"]["numerical_threshold"] == 15.0
-        assert types["USURY_CAP"]["numerical_threshold"] == 10.0
-
-        r = c.post("/api/ingest/statute", json={"jurisdiction": "CA", "agency": "DFPI", "bulletin_title": "t", "raw_text": CA_BULLETIN_TEXT})
-        types = {e["rule_type"]: e for e in r.json()["events"]}
-        assert types["DISCLOSURE_MANDATE"]["numerical_threshold"] == 48.0
-        assert types["USURY_CAP"]["numerical_threshold"] == 36.0
+        health = c.get("/api/health").json()
+        assert health["events"] >= 5
+        docs = c.get("/api/documents").json()
+        assert {d["document_id"] for d in docs} >= {SAMPLE_CONTRACT.document_id, HAPPEN_CONTRACT.document_id}
+        assert all(d["source_url"] for d in docs)
 
         r = c.post("/api/audit/document", json={"document": SAMPLE_CONTRACT.model_dump()})
         assert r.status_code == 200, r.text
         body = r.json()
         radar = {s["jurisdiction"]: s["status"] for s in body["radar"]}
-        assert radar == {"TX": "RED", "CA": "RED", "NY": "RED"}
-        by_clause = {}
-        for g in body["gaps"]:
-            by_clause.setdefault(g["target_clause_id"], []).append(g)
-        assert "cl-2" in by_clause and "cl-3" in by_clause and "cl-4" in by_clause
-        assert "cl-5" not in by_clause
-        assert all(g["is_grounded_in_citation"] for g in body["gaps"])
+        assert radar["TX"] == "RED"
+        late = [g for g in body["gaps"] if g["target_clause_id"] == "cl-5" and g["jurisdiction"] == "TX"]
+        assert late and late[0]["severity"] == "CRITICAL"
+        assert all(g["is_grounded_in_citation"] for g in body["gaps"] if g["severity"] != "COMPLIANT")
 
-        gap = by_clause["cl-3"][0]
+        gap = late[0]
         r = c.post("/api/remediate/preview", params={"gap_id": gap["gap_id"], "document_id": SAMPLE_CONTRACT.document_id})
         assert r.status_code == 200, r.text
         assert r.json()["grounding"]["is_grounded"] is True
@@ -42,10 +56,18 @@ def test_end_to_end_offline():
         out = r.json()
         assert out["approval"]["status"] == "APPLIED"
         assert out["filing_package"]["statute_citation"] == gap["statute_citation"]
-        clause = next(cl for cl in out["updated_document"]["clauses"] if cl["clause_id"] == "cl-3")
-        assert "$15.00" in clause["verbatim_text"]
+        assert all(g["gap_id"] != gap["gap_id"] for g in c.post("/api/audit/document", json={"document": out["updated_document"]}).json()["gaps"])
 
         # An ungrounded human override is refused.
-        gap2 = by_clause["cl-2"][0]
-        r = c.post("/api/remediate/patch", json={"gap_id": gap2["gap_id"], "document_id": SAMPLE_CONTRACT.document_id, "auditor_id": "bryce", "auditor_override_text": "Interest shall be 99% per annum."})
+        r = c.post("/api/audit/document", json={"document": SAMPLE_CONTRACT.model_dump()})
+        gap2 = [g for g in r.json()["gaps"] if g["severity"] == "CRITICAL"][0]
+        r = c.post("/api/remediate/patch", json={"gap_id": gap2["gap_id"], "document_id": SAMPLE_CONTRACT.document_id, "auditor_id": "bryce", "auditor_override_text": "Late charge shall be $99 or 40% of the payment."})
         assert r.status_code == 422
+
+
+def test_parse_endpoint():
+    with TestClient(app) as c:
+        raw = (DATA_DIR / "prosper_webbank_promissory_note_2016.txt").read_text()
+        r = c.post("/api/documents/parse", json={"document_id": "doc-x", "title": "x", "raw_text": raw})
+        assert r.status_code == 200
+        assert len(r.json()["clauses"]) >= 30

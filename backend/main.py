@@ -5,7 +5,9 @@
 Endpoints
     GET  /api/health
     GET  /api/events                 active regulatory events
-    GET  /api/documents/sample       seeded non-compliant contract
+    GET  /api/documents              seeded real contracts
+    GET  /api/documents/sample       default contract (Prosper/WebBank note from SEC EDGAR)
+    POST /api/documents/parse        split raw agreement text into clauses
     GET  /api/radar                  per-state status for a document
     POST /api/ingest/statute         Agent A
     POST /api/audit/document         Agent B
@@ -25,7 +27,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from agents import CertoPipeline, build_llm_client
-from mock_data import SAMPLE_CONTRACT, SEED_BULLETINS, SEED_EVENTS
+from mock_data import SAMPLE_CONTRACT, SEED_BULLETINS, SEED_DOCUMENTS, SEED_EVENTS
+from parser import parse_contract_text
 from schemas import (
     AuditRequest,
     AuditResponse,
@@ -35,6 +38,7 @@ from schemas import (
     FilingPackage,
     Jurisdiction,
     JurisdictionStatus,
+    ParseContractRequest,
     RegulatoryEvent,
     RemediationApproval,
     RemediationPatch,
@@ -63,7 +67,8 @@ async def lifespan(app: FastAPI):
                 store.upsert_events(events)
         else:
             store.upsert_events(SEED_EVENTS)
-    store.upsert_document(SAMPLE_CONTRACT)
+    for d in SEED_DOCUMENTS:
+        store.upsert_document(d)
     log.info("Certo up: mode=%s events=%d", app.state.pipeline.mode, len(store.list_events()))
     yield
 
@@ -120,9 +125,23 @@ def list_events(jurisdiction: Optional[List[Jurisdiction]] = Query(None)):
     return _store().list_events(jurisdiction)
 
 
+@app.get("/api/documents", response_model=List[ContractDocument])
+def list_documents():
+    return _store().list_documents()
+
+
 @app.get("/api/documents/sample", response_model=ContractDocument)
 def sample_document():
     return _store().get_document(SAMPLE_CONTRACT.document_id) or SAMPLE_CONTRACT
+
+
+@app.post("/api/documents/parse", response_model=ContractDocument)
+def parse_document(req: ParseContractRequest):
+    doc = parse_contract_text(req.document_id, req.title, req.raw_text, req.jurisdiction, req.source_url, req.source_type)
+    if len(doc.clauses) < 2:
+        raise HTTPException(422, "Could not split the text into clauses")
+    _store().upsert_document(doc)
+    return doc
 
 
 @app.get("/api/documents/{document_id}", response_model=ContractDocument)
