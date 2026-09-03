@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+body { @apply bg-ink-950 text-slate-200 antialiased; }
+::selection { @apply bg-emerald-500/40; }
