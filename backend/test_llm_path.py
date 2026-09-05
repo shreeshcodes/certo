@@ -5,7 +5,7 @@ against the deterministic read, dual-judge AND, fallback on failure) without a
 network. It is not a substitute for a run against a live key; see README.
 """
 from agents import CertoPipeline, LLMClient, _EventList, _GapList, _Redline
-from mock_data import SAMPLE_CONTRACT, SEED_EVENTS, TX_342_203_TEXT
+from mock_data import PROSPER_CONTRACT, SEED_EVENTS, TX_342_203_TEXT
 from schemas import ComplianceGap, GroundingVerdict, RegulatoryEvent
 
 
@@ -84,9 +84,9 @@ def test_gap_engine_keeps_deterministic_and_filters_llm_gaps():
         ])
 
     p = CertoPipeline(_client(behaviour))
-    gaps, mode = p.gap_engine.run(SAMPLE_CONTRACT, SEED_EVENTS)
+    gaps, mode = p.gap_engine.run(PROSPER_CONTRACT, SEED_EVENTS)
     assert mode == "llm"
-    det_gaps, _ = CertoPipeline(None).gap_engine.run(SAMPLE_CONTRACT, SEED_EVENTS)
+    det_gaps, _ = CertoPipeline(None).gap_engine.run(PROSPER_CONTRACT, SEED_EVENTS)
     assert {g.gap_id for g in det_gaps} <= {g.gap_id for g in gaps}
     extra = [g for g in gaps if g.gap_id not in {d.gap_id for d in det_gaps}]
     assert len(extra) == 1 and extra[0].target_clause_id == "cl-16" and extra[0].confidence_score == 0.8
@@ -94,7 +94,7 @@ def test_gap_engine_keeps_deterministic_and_filters_llm_gaps():
 
 
 def test_remediator_reverts_ungrounded_llm_redline_and_ands_the_judges():
-    det_gaps, _ = CertoPipeline(None).gap_engine.run(SAMPLE_CONTRACT, SEED_EVENTS)
+    det_gaps, _ = CertoPipeline(None).gap_engine.run(PROSPER_CONTRACT, SEED_EVENTS)
     gap = next(g for g in det_gaps if g.statute_citation == "Tex. Fin. Code § 342.203(d)")
     event = next(e for e in SEED_EVENTS if e.statute_citation == gap.statute_citation)
 
@@ -103,7 +103,7 @@ def test_remediator_reverts_ungrounded_llm_redline_and_ands_the_judges():
             return _Redline(redlined_text="Late charge shall be $99 or 40% of the payment under Tex. Fin. Code § 342.203(d).", change_rationale="wrong")
         return GroundingVerdict(is_grounded=True, cited_statute_present=True, numbers_match_statute=True, no_invented_obligations=True, judge_rationale="llm says fine", confidence=0.9)
 
-    patch = CertoPipeline(_client(bad_drafter)).remediator.run(gap, SAMPLE_CONTRACT, event)
+    patch = CertoPipeline(_client(bad_drafter)).remediator.run(gap, PROSPER_CONTRACT, event)
     assert patch.redlined_text == gap.suggested_patch  # deterministic judge rejected the LLM draft
     assert patch.grounding.is_grounded is True
     assert "LLM judge" in patch.grounding.judge_rationale
@@ -113,7 +113,7 @@ def test_remediator_reverts_ungrounded_llm_redline_and_ands_the_judges():
             return _Redline(redlined_text=gap.suggested_patch, change_rationale="same as deterministic")
         return GroundingVerdict(is_grounded=False, cited_statute_present=True, numbers_match_statute=True, no_invented_obligations=False, judge_rationale="llm objects", confidence=0.7)
 
-    patch = CertoPipeline(_client(strict_llm_judge)).remediator.run(gap, SAMPLE_CONTRACT, event)
+    patch = CertoPipeline(_client(strict_llm_judge)).remediator.run(gap, PROSPER_CONTRACT, event)
     assert patch.grounding.is_grounded is False  # both judges must agree
     assert patch.grounding.confidence == 0.7
 
@@ -125,5 +125,5 @@ def test_llm_failure_falls_back_to_deterministic():
     p = CertoPipeline(_client(boom))
     events, mode = p.extractor.run("TX", "OCCC", TX_342_203_TEXT, code_name="Tex. Fin. Code")
     assert mode == "deterministic" and events
-    gaps, mode = p.gap_engine.run(SAMPLE_CONTRACT, SEED_EVENTS)
+    gaps, mode = p.gap_engine.run(PROSPER_CONTRACT, SEED_EVENTS)
     assert mode == "deterministic" and gaps

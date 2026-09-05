@@ -1,4 +1,29 @@
 {
+  "onemain_texas_loan_agreement_2026.txt": {
+    "title": "OneMain Financial Group, LLC Texas Loan Agreement and Disclosure Statement (sample form TXSTLA0726)",
+    "source_url": "https://www.onemainfinancial.com/pdf/LA-TX-STLA0726.pdf",
+    "source_type": "Lender legal page, state-specific sample loan agreement PDF. OneMain Financial Group, LLC is a state-licensed non-bank lender; the form says the lender is licensed and examined under Texas law by the Office of Consumer Credit Commissioner and that Texas and federal law govern it.",
+    "document_date": "2026-07 (form code TXSTLA0726; PDF created 2026-07-01; served with Last-Modified 2026-08-31)",
+    "retrieved_at": "2026-09-05T22:18:12+00:00",
+    "source_pdf_sha256": "4b383829e8ca4815869b58947844905fae0294c3514025cb59bd931ac30bc27d",
+    "extraction": "scripts/extract_pdf_text.py: poppler pdftotext -layout per page; the AllAndNone barcode-font glyph runs dropped; recurring page furniture removed (SEE ADDITIONAL PAGES banner, Initials lines, the dated C.E. Agreement page footer with the form code, the Account Number/TBD page header, NNNNNNNN-TEST sample stamps); runs of spaces collapsed. No words changed. The PDF's own text layer reads 'monthlv beainnina' in the payment-schedule box and renders checkboxes as X, D, [Z], [xi and n; kept as extracted. Sample values ($5,000 over 48 months at 31.35% APR) are the lender's own.",
+    "sha256": "b913eae48125eac70f1b81ebcd7ef629f13a28a231196ea4fbcde1190421438c"
+  },
+  "onemain_california_loan_agreement_2026.txt": {
+    "title": "OneMain Financial Group, LLC California Loan Agreement and Disclosure Statement (sample form CASTLA0726)",
+    "source_url": "https://www.onemainfinancial.com/pdf/LA-CA-STLA0726.pdf",
+    "source_type": "Lender legal page, state-specific sample loan agreement PDF. OneMain Financial Group, LLC is a state-licensed non-bank lender; the form says it is governed by federal law and the California Finance Lenders Law, Division 9 of the Financial Code.",
+    "document_date": "2026-07 (form code CASTLA0726; PDF created 2026-07-01; served with Last-Modified 2026-08-31)",
+    "retrieved_at": "2026-09-05T22:18:13+00:00",
+    "source_pdf_sha256": "ac73bf6edf3e565681940dbeaa6289f5d0a8475e19fe38c44f5231b03380a0f4",
+    "extraction": "Same script and rules as the Texas form. Pages 2, 3 and 5 of this PDF are scanned images with no text layer (the security, insurance, default and remedies terms and the first part of the arbitration agreement); they are marked in the text with a bracketed line and are not reproduced. Page 2 carries only the overlaid fill-in values (date, 32.86% rate). Every fee, prepayment, term, disclosure and governing-law clause is on a text-layer page.",
+    "pages_without_text_layer": [
+      2,
+      3,
+      5
+    ],
+    "sha256": "c9f5ae5d9418c8e045c7fa9d8d8c135b4bc14d6f7708fa6ba1d7e8cfd2a009b8"
+  },
   "prosper_webbank_promissory_note_2016.txt": {
     "title": "Prosper Funding LLC / WebBank Promissory Note (Exhibit A to Borrower Registration Agreement)",
     "source_url": "https://www.sec.gov/Archives/edgar/data/1416265/000156459016015019/prosper-ex1022_926.htm",

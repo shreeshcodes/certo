@@ -141,6 +141,9 @@ _MONTHS_RE = re.compile(r"(\d+)\s*months?\b", re.IGNORECASE)
 _HOURS_RE = re.compile(r"(?:(\d+)|\b(" + _WORD_NUM_RE + r")\b)\s*(?:\((\d+)\))?\s*hours?\b", re.IGNORECASE)
 _DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 _BLANK_RE = re.compile(r"_{3,}")
+# form-fill tolerant anchors for the remediation patch ("_5.00__ %", "$__ 10.00_")
+_PCT_BLANK_RE = re.compile(r"\d+(?:\.\d+)?[\s_]*(?:%|percent)", re.IGNORECASE)
+_USD_BLANK_RE = re.compile(r"\$[\s_]*(\d+(?:,\d{3})*(?:\.\d{1,2})?)")
 
 _CODE_NAMES = {
     "TX": "Tex. Fin. Code",
@@ -177,6 +180,17 @@ def _percents(text: str) -> List[float]:
 
 def _dollars(text: str) -> List[float]:
     return [float(m.group(1).replace(",", "")) for m in _USD_RE.finditer(text)]
+
+
+def _unblank(text: str) -> str:
+    """Form-fill blanks: an e-signed agreement reads "charged _5.00__ % of the
+    payment" or "$_______ 30.00", the underscores being the printed blank the
+    value was typed over. Drop the underscores so the number parsers see the
+    value. Zero-dollar figures are thresholds ("if the payment exceeds $0"), not
+    fees, so they are blanked too."""
+    text = re.sub(r"_+", " ", text)
+    text = re.sub(r"\$\s?0(?:\.00?)?(?![\d,.])", " ", text)
+    return re.sub(r"[ \t]+", " ", text)
 
 
 def _days(text: str) -> List[float]:
@@ -317,7 +331,7 @@ def parse_fee_formula(text: str, kind: Optional[FeeKind] = None) -> Optional[Fee
     kind = kind or _fee_kind(text)
     if kind is None:
         return None
-    scope = _LOAN_SIZE_RE.sub(lambda m: m.group(1), _fee_sentences(text, kind))
+    scope = _LOAN_SIZE_RE.sub(lambda m: m.group(1), _unblank(_fee_sentences(text, kind)))
     if not scope:
         return FeeFormula(kind, "UNQUANTIFIED", None, None, None, False, False)
     low = scope.lower()
@@ -328,7 +342,7 @@ def parse_fee_formula(text: str, kind: Optional[FeeKind] = None) -> Optional[Fee
     if cents is not None:
         pct = [cents] + pct
     # A cap sentence ("not to exceed", "greater of") is the binding one when present.
-    cap = _sentence_containing(scope, re.compile(r"not to exceed|may not exceed|not in excess of|not exceeding|greater of|lesser of|whichever is less|equal to", re.IGNORECASE))
+    cap = _sentence_containing(scope, re.compile(r"not to exceed|may not exceed|not in excess of|not exceeding|not more than|no more than|greater of|lesser of|whichever is less|equal to", re.IGNORECASE))
     comb_m = re.search(r"(?i)(?:greater|lesser) of|whichever is less", cap)
     cap_tail = cap[comb_m.start():] if comb_m and comb_m.group(0).lower() != "whichever is less" else cap
     cap_usd = _dollars(_CENTS_PER_DOLLAR_RE.sub(" ", cap_tail))
@@ -346,7 +360,8 @@ def parse_fee_formula(text: str, kind: Optional[FeeKind] = None) -> Optional[Fee
     elif pct_v is not None and usd_v is None:
         comb = "FLAT_PCT"
     elif usd_v is not None and pct_v is not None:
-        comb = "LESSER_OF" if ("not exceed" in low or "not in excess" in low) else "GREATER_OF"
+        # "5% of the payment, not to exceed $15" is a ceiling: the lesser of the two
+        comb = "LESSER_OF" if re.search(r"not (?:to )?exceed|not in excess|not more than|no more than|whichever is less", low) else "GREATER_OF"
     else:
         comb = "UNQUANTIFIED"
     days = _days(scope)
@@ -922,12 +937,39 @@ class GapAnalysisEngine:
         )
 
     @staticmethod
-    def _fee_patch(text: str, event: RegulatoryEvent, formula: FeeFormula) -> str:
+    def _cap_phrase(spec: FeeCapSpec) -> str:
+        if spec.combinator == "FLAT_USD":
+            return f"not to exceed ${spec.usd_max:.2f}"
+        if spec.combinator == "FLAT_PCT":
+            return f"not to exceed {spec.pct_max:g}% of the scheduled payment"
+        which = "greater" if spec.combinator == "GREATER_OF" else "lesser"
+        return f"not to exceed the {which} of ${spec.usd_max:.2f} or {spec.pct_max:g}% of the scheduled payment"
+
+    @staticmethod
+    def _qualify(text: str, anchor: re.Pattern, phrase: str) -> str:
+        """Append ", <phrase>" to the sentence that carries the fee amount."""
+        m = anchor.search(text)
+        if m:
+            end = re.compile(r"\.(?=\s|$)").search(text, m.end())
+            if end:
+                return f"{text[:end.start()]}, {phrase}{text[end.start():]}"
+        return f"{text.rstrip('.')}, {phrase}."
+
+    def _fee_patch(self, text: str, event: RegulatoryEvent, formula: FeeFormula) -> str:
         """Rewrite the offending formula in place so the corrected clause re-audits clean."""
         spec = event.fee_cap
         assert spec is not None
         patched = text
-        if spec.combinator == "FLAT_PCT":
+        # A percentage formula against a dollar cap (or a flat dollar fee against a
+        # percentage cap) has no number to clamp; the fix is a "not to exceed" qualifier
+        # on the sentence that states the fee, which the fee parser reads as LESSER_OF.
+        cross_shape = (formula.combinator == "FLAT_PCT" and spec.usd_max is not None and spec.pct_max is None) or (
+            formula.combinator == "FLAT_USD" and spec.pct_max is not None
+        )
+        if cross_shape:
+            anchor = _PCT_BLANK_RE if formula.combinator == "FLAT_PCT" else _USD_BLANK_RE
+            patched = self._qualify(patched, anchor, self._cap_phrase(spec))
+        elif spec.combinator == "FLAT_PCT":
             patched = re.sub(r"(?i)the (?:greater|lesser) of \$\s?[\d,.]+ or (\d+(?:\.\d+)?\s?(?:percent|%)|[a-z ]+percent(?: \(\d+%\))?) of", r"\1 of", patched)
             patched = _PCT_RE.sub(lambda m: f"{spec.pct_max:g}%" if float(m.group(1)) > spec.pct_max else m.group(0), patched)
             patched = _USD_RE.sub("", patched) if "greater of" not in patched.lower() and "lesser of" not in patched.lower() and formula.combinator in ("GREATER_OF", "LESSER_OF", "FLAT_USD") and _USD_RE.search(patched) and spec.usd_max is None else patched

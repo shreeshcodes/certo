@@ -35,9 +35,16 @@ def _load_contract(filename: str, document_id: str) -> ContractDocument:
     )
 
 
-SAMPLE_CONTRACT: ContractDocument = _load_contract("prosper_webbank_promissory_note_2016.txt", "doc-prosper-note-2016")
+# State-licensed non-bank lender forms first: OneMain Financial Group, LLC is
+# licensed by the Texas OCCC and under the California Financing Law, so the
+# Texas and California caps bind these contracts directly. The two bank notes
+# (WebBank, Happen Bank) may export their home-state rates under federal law.
+ONEMAIN_TX_CONTRACT: ContractDocument = _load_contract("onemain_texas_loan_agreement_2026.txt", "doc-onemain-tx-2026")
+ONEMAIN_CA_CONTRACT: ContractDocument = _load_contract("onemain_california_loan_agreement_2026.txt", "doc-onemain-ca-2026")
+PROSPER_CONTRACT: ContractDocument = _load_contract("prosper_webbank_promissory_note_2016.txt", "doc-prosper-note-2016")
 HAPPEN_CONTRACT: ContractDocument = _load_contract("happen_bank_loan_agreement_2026.txt", "doc-happen-note-2026")
-SEED_DOCUMENTS: List[ContractDocument] = [SAMPLE_CONTRACT, HAPPEN_CONTRACT]
+SAMPLE_CONTRACT: ContractDocument = ONEMAIN_TX_CONTRACT  # the primary demo document
+SEED_DOCUMENTS: List[ContractDocument] = [ONEMAIN_TX_CONTRACT, ONEMAIN_CA_CONTRACT, PROSPER_CONTRACT, HAPPEN_CONTRACT]
 
 # ---------------------------------------------------------------------------
 # Verbatim statutory excerpts (primary sources). These feed Agent A in
@@ -322,6 +329,6 @@ SEED_EVENTS += [
 ]
 
 SEED_POLICIES: List[CompanyPolicy] = [
-    CompanyPolicy(policy_id="pol-late-fee", name="Late fee formula: greater of $15 or 5% of the late payment", jurisdiction="FED", rule_type="FEE_CAP", current_value=15.0, unit="USD", source_document_id=SAMPLE_CONTRACT.document_id),
-    CompanyPolicy(policy_id="pol-nsf-fee", name="Returned payment fee", jurisdiction="FED", rule_type="FEE_CAP", current_value=15.0, unit="USD", source_document_id=SAMPLE_CONTRACT.document_id),
+    CompanyPolicy(policy_id="pol-late-fee", name="Late fee formula: greater of $15 or 5% of the late payment", jurisdiction="FED", rule_type="FEE_CAP", current_value=15.0, unit="USD", source_document_id=PROSPER_CONTRACT.document_id),
+    CompanyPolicy(policy_id="pol-nsf-fee", name="Returned payment fee", jurisdiction="FED", rule_type="FEE_CAP", current_value=15.0, unit="USD", source_document_id=PROSPER_CONTRACT.document_id),
 ]

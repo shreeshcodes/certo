@@ -6,7 +6,7 @@ Endpoints
     GET  /api/health
     GET  /api/events                 active regulatory events
     GET  /api/documents              seeded real contracts
-    GET  /api/documents/sample       default contract (Prosper/WebBank note from SEC EDGAR)
+    GET  /api/documents/sample       primary contract (OneMain Financial Texas loan agreement)
     POST /api/documents/parse        split raw agreement text into clauses
     GET  /api/radar                  per-state status for a document
     POST /api/ingest/statute         Agent A

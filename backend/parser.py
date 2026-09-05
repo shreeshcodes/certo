@@ -20,6 +20,21 @@ Real-document quirks handled deliberately:
 * a "State Notices" block is split into one clause per state, matching both
   "New Jersey Residents" and "NEW JERSEY RESIDENTS:" forms without breaking
   two-word state names.
+
+Form-style agreements (the OneMain sample loan agreements) add four more:
+
+* an itemization table ("1. $NONE Paid To", "2. $ Paid To" ...) is not a
+  numbered clause list, so the numbered strategy is rejected when fewer than
+  half of its items carry a sentence;
+* an all-caps form label ending in a colon at the start of a line
+  ("LATE CHARGE:", "PREPAYMENT:") is a heading, and a short all-caps section
+  title with no terminal punctuation ("ITEMIZATION OF AMOUNT FINANCED",
+  "B. LOAN TERMS AND CONDITIONS") is one too; neither needs the previous line
+  to have ended a sentence, and a title that is immediately followed by
+  another heading is folded into that heading's clause;
+* a numbered all-caps run-in heading inside a headings-style document
+  ("1. ADDITIONAL DEFINITIONS.", "2. WHAT CLAIMS ARE COVERED?") is a heading;
+* an all-caps heading may run to nine words, a mixed-case one still to six.
 """
 from __future__ import annotations
 
@@ -31,7 +46,13 @@ from schemas import ContractClause, ContractDocument
 
 _MARKER = re.compile(r"(?:^|\n)[ \t]*(\d{1,2})\.[ \t]+")
 _RUN_IN_HEADING = re.compile(r"^([A-Z][^\n.]{1,70}?)\.(?=\s)")
-_HEADING_LINE = re.compile(r"(?:^|\n)([A-Z][A-Za-z0-9 ,;'&/()-]{2,70})\.(?=[ \t])")
+_HEADING_LINE = re.compile(r"(?:^|\n)((?:\d{1,2}\.[ \t]+)?[A-Z][A-Za-z0-9 ,;'&/()-]{2,70})[.?](?=[ \t])")
+_LABEL_LINE = re.compile(r"(?:^|\n)([A-Z][A-Z0-9 ,;'&/()-]{2,40}?) ?:(?=[ \t])")
+_TITLE_LINE = re.compile(r"^[A-Z][A-Z ,;'&/()-]*(?:\. [A-Z][A-Z ,;'&/()-]*)?$")
+_NUMBER_PREFIX = re.compile(r"^\d{1,2}\.\s+")
+# A mixed-case line that opens with one of these is a sentence, not a heading
+# ("The FAA governs this Arbitration Agreement.").
+_SENTENCE_OPENERS = {"the", "a", "an", "if", "you", "i", "we", "this", "that", "any", "in", "for", "to", "by", "no", "nor", "it", "unless", "after", "before", "my", "your", "all", "each", "such", "these", "those", "as", "at", "on", "or", "and", "see"}
 _STATE_NAMES = (
     "Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|"
     "Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|"
@@ -43,6 +64,7 @@ _STATE = re.compile(
     rf"(?:{_STATE_NAMES})(?:,? and (?:{_STATE_NAMES}))? Residents:?",
     re.IGNORECASE,
 )
+_STATE_LEAD = re.compile(rf"^(?:{_STATE_NAMES})\b", re.IGNORECASE)  # state notices belong to _split_state_notices
 _SENTENCE_END = re.compile(r"[.:;!?\"”')\]]\s*$")
 
 
@@ -59,6 +81,13 @@ def _numbered(raw: str) -> List[Tuple[str, str]]:
         hits.append(m)
         expected += 1
     if len(hits) < 3:
+        return []
+    worded = 0
+    for i, h in enumerate(hits):
+        end = hits[i + 1].start() if i + 1 < len(hits) else len(raw)
+        if len(re.findall(r"[A-Za-z]{2,}", raw[h.end():end])) >= 6:
+            worded += 1
+    if worded < max(3, len(hits) // 2):
         return []
     out: List[Tuple[str, str]] = []
     for i, h in enumerate(hits):
@@ -80,21 +109,67 @@ def _numbered(raw: str) -> List[Tuple[str, str]]:
     return out
 
 
+def _is_title(line: str) -> bool:
+    words = line.split()
+    real = [w for w in words if len(re.sub(r"[^A-Za-z]", "", w)) >= 3]
+    return bool(line) and 2 <= len(words) <= 6 and len(real) >= 2 and bool(_TITLE_LINE.match(line))
+
+
+def _mostly_upper(line: str) -> bool:
+    letters = [c for c in line if c.isalpha()]
+    return len(letters) >= 3 and sum(c.isupper() for c in letters) / len(letters) > 0.7
+
+
 def _headings(raw: str) -> List[Tuple[str, str]]:
-    lines_before: List[int] = [0] + [m.end() for m in re.finditer(r"\n", raw)]
-    hits = []
+    # (position, heading, kind) for every candidate boundary
+    found: List[Tuple[int, str, str]] = []
     for h in _HEADING_LINE.finditer(raw):
-        if len(h.group(1).split()) > 6:
+        heading = h.group(1)
+        body = _NUMBER_PREFIX.sub("", heading)
+        if body != heading and not body.isupper():
+            continue
+        if len(body.split()) > (9 if body.isupper() else 6):
+            continue
+        if not body.isupper() and body.split()[0].lower() in _SENTENCE_OPENERS:
             continue
         line_start = h.start() + 1 if raw[h.start()] == "\n" else h.start()
-        prev_line = raw[: line_start].rstrip("\n").split("\n")[-1] if line_start else ""
-        if prev_line and not _SENTENCE_END.search(prev_line):
+        found.append((line_start, heading, "heading"))
+    for h in _LABEL_LINE.finditer(raw):
+        if _STATE_LEAD.match(h.group(1)):
             continue
-        hits.append((line_start, h.group(1)))
-    if len(hits) < 3:
+        line_start = h.start() + 1 if raw[h.start()] == "\n" else h.start()
+        found.append((line_start, h.group(1).strip(), "label"))
+    for m in re.finditer(r"(?:^|\n)([^\n]+)", raw):
+        line = m.group(1).strip()
+        if _is_title(line) and not _STATE_LEAD.match(line):
+            found.append((m.start(1), line, "title"))
+    found.sort()
+    hits: List[Tuple[int, str, str]] = []
+    for line_start, heading, kind in found:
+        if hits and hits[-1][0] == line_start:
+            continue
+        prev_line = raw[:line_start].rstrip("\n").split("\n")[-1].strip() if line_start else ""
+        if kind == "heading" and prev_line and not _SENTENCE_END.search(prev_line) and not _is_title(prev_line):
+            # a wrapped line can start with "Lender." but not with an all-caps
+            # heading, unless the wrapped text is itself all caps (a notice block)
+            if not (_mostly_upper(_NUMBER_PREFIX.sub("", heading)) and not _mostly_upper(prev_line)):
+                continue
+        hits.append((line_start, heading, kind))
+    # a title immediately followed by another heading names nothing of its own
+    folded: List[Tuple[int, str, str]] = []
+    for i, (start, heading, kind) in enumerate(hits):
+        if kind == "title" and i + 1 < len(hits):
+            nxt = hits[i + 1]
+            between = raw[start + len(heading):nxt[0]]
+            if not between.strip():
+                hits[i + 1] = (start, nxt[1], nxt[2])
+                continue
+        folded.append((start, heading, kind))
+    hits = folded
+    if len([h for h in hits if h[2] != "title"]) < 3:
         return []
     out: List[Tuple[str, str]] = []
-    for i, (start, heading) in enumerate(hits):
+    for i, (start, heading, _kind) in enumerate(hits):
         end = hits[i + 1][0] if i + 1 < len(hits) else len(raw)
         out.append((_collapse(heading), _collapse(raw[start:end])))
     preamble = _collapse(raw[: hits[0][0]])

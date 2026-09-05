@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command demo: clean state, seeded rules, both real contracts audited,
+# One-command demo: clean state, seeded rules, all four real contracts audited,
 # dashboard open and ready to walk through.
 #
 #   ./scripts/demo.sh            # start backend (8000) + frontend (3000), run the audit, open the browser
