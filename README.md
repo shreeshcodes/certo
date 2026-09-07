@@ -123,7 +123,7 @@ npm install
 npm run dev
 ```
 
-Tests:
+Tests (offline, about a second; CI runs the same suite on every push and pull request via `.github/workflows/tests.yml`):
 
 ```bash
 cd backend && source .venv/bin/activate && pip install pytest && python -m pytest -q
