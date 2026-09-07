@@ -194,11 +194,11 @@ def test_onemain_texas_form_audit():
         assert any(cite.startswith("Tex. Fin. Code § 342.502(d)") and c == "cl-39" for cite, c in passed)  # $30 returned-check charge
         warn = {(g["statute_citation"], g["target_clause_id"]) for g in body["gaps"] if g["severity"] == "WARNING"}
         assert ("Cal. Fin. Code § 22305", "cl-37") in warn  # administrative fee amount is in the itemization, not the clause
-        # Open encoding question, pinned so a change is deliberate: N.Y. Banking Law § 351 is seeded with an
-        # 11-day minimum while Tex. Fin. Code § 342.203 ("after the 10th day") is seeded with 10; this form's
-        # "within 10 days after it is due" therefore fails NY on grace days alone.
-        ny = [g for g in body["gaps"] if g["jurisdiction"] == "NY"]
-        assert ny and all("after 10 days" in g["violation_reason"] and "11 days" in g["violation_reason"] for g in ny)
+        # N.Y. Banking Law § 351 ("default of more than ten days") is seeded with a 10-day minimum, the same
+        # reading as Texas' "after the 10th day": this form's "within 10 days after it is due" charges on day 11
+        # and passes both.
+        assert radar["NY"] == "GREEN"
+        assert all(("N.Y. Banking Law § 351", cl) in passed for cl in late_clauses)
 
 
 def test_onemain_california_form_audit():
@@ -210,6 +210,7 @@ def test_onemain_california_form_audit():
         assert ("Cal. Fin. Code § 22320.5(a)-(b)", "cl-5") in passed  # flat $10 after 10 days
         crit = {(g["jurisdiction"], g["statute_citation"]) for g in body["gaps"] if g["severity"] == "CRITICAL"}
         assert ("TX", "Tex. Fin. Code § 342.203(d)") in crit  # $10 flat exceeds 5% of a small installment
+        assert ("NY", "N.Y. Banking Law § 351") in crit and radar["NY"] == "RED"  # same arithmetic under the 5% NY cap
         tx = next(g for g in body["gaps"] if g["jurisdiction"] == "TX" and g["statute_citation"] == "Tex. Fin. Code § 342.203(d)")
         assert "$10.00 on a $50 installment" in tx["violation_reason"]
 

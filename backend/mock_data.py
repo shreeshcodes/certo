@@ -322,9 +322,9 @@ SEED_EVENTS += [
         raw_source_snippet="In the event of default of more than ten days in the payment of any scheduled installment, the licensee may charge and collect a default charge not exceeding five percent of the installment in default. This charge may not be collected more than once for the same default and may be collected at the time of such default or at any time thereafter.",
         numerical_threshold=5.0,
         threshold_unit="PERCENT_OF_INSTALLMENT",
-        fee_cap=FeeCapSpec(fee_kind="LATE", combinator="FLAT_PCT", usd_max=None, pct_max=5.0, min_grace_days=11, once_per_installment=True),
+        fee_cap=FeeCapSpec(fee_kind="LATE", combinator="FLAT_PCT", usd_max=None, pct_max=5.0, min_grace_days=10, once_per_installment=True),
         applicability="Article 9 licensed lenders (personal loans of $25,000 or less, Banking Law § 340)",
-        verification=_v("MATCH", 0.9, STATUTE_INDEX["ny-bnk-351"]["source_url"], "Verbatim from nysenate.gov (retrieved through a fetch; the site challenges non-browser clients). 'More than ten days' is encoded as an 11-day minimum."),
+        verification=_v("MATCH", 0.9, STATUTE_INDEX["ny-bnk-351"]["source_url"], "Verbatim from nysenate.gov (retrieved through a fetch; the site challenges non-browser clients). 'More than ten days' is encoded as a 10-day minimum: ten full days must elapse before the charge, the same reading as Tex. Fin. Code § 342.203's 'after the 10th day'. Corrected 2026-09-06 from 11, which had flagged a contract that charges on day 11."),
     ),
 ]
 

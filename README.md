@@ -95,14 +95,14 @@ in `backend/.env` to turn on the LLM path (see `.env.example`).
 
 ### 60-second walkthrough
 
-1. **Radar (0:00).** The dashboard opens on OneMain Financial's Texas loan agreement. Texas is green, California and New York are red. Say: "This is the published form of a lender the Texas OCCC licenses, so the Texas caps bind it, and it passes them: the 5% late charge after 10 days and the $30 returned-check charge. The engine is not just finding fault."
+1. **Radar (0:00).** The dashboard opens on OneMain Financial's Texas loan agreement. Texas and New York are green, California is red. Say: "This is the published form of a lender the Texas OCCC licenses, so the Texas caps bind it, and it passes them: the 5% late charge after 10 days and the $30 returned-check charge. The engine is not just finding fault."
 2. **Click the CA card (0:10).** Two critical gaps on the same late-charge formula, once in Section B (clause cl-38, **LATE CHARGE**) and once in the Truth in Lending box (cl-5). Click cl-38's **Cal. Fin. Code § 22320.5** entry.
 3. **Split diff (0:18).** Left: the verbatim statute, "an amount not in excess of fifteen dollars ($15)". Right: "The late charge will be 5% of the scheduled payment." Below: "yields $100.00 on a $2000 installment, above the statutory maximum of $15.00." Point at the green **source match** badge and its **primary source** link.
 4. **Generate AI patch (0:30).** The redline appends ", not to exceed $15.00" to the formula sentence, adds the once-per-installment sentence, and cites the section. The verifier panel shows three green checks: statute cited, every number traceable, no invented obligations.
 5. **Edit the redline (0:38), optional.** Change $15.00 to $99.00 and click Approve: the server refuses with a 422 because the edited text fails grounding. Undo the edit.
 6. **Approve & Apply (0:45).** Clause cl-38 is amended, a California filing package appears at the bottom with before/after text and an auditor attestation, and the radar re-audits: California drops from two criticals to one, because the Truth in Lending box still carries the original formula. Approve cl-5 the same way and California turns amber: only warnings remain (the administrative fee amount lives in the itemization, not the clause, and the note carries no CFL license number). Texas stays green throughout.
 7. **Show passed checks (0:55).** Expand the green list for Texas: § 342.203(d) and § 302.001(d) on both late-charge clauses, and § 3.506(b) on the $30 returned-check charge.
-8. **Switch documents (1:00).** Pick the California form in the header dropdown: California is green (a flat $10 after 10 days), Texas is red (the flat $10 exceeds 5% of a $50 installment). Then pick the Prosper/WebBank note: all three states red, with the bank-exportation caveat below.
+8. **Switch documents (1:00).** Pick the California form in the header dropdown: California is green (a flat $10 after 10 days), Texas and New York are red (the flat $10 exceeds 5% of a $50 installment under both states' percentage caps). Then pick the Prosper/WebBank note: all three states red, with the bank-exportation caveat below.
 
 ## Run pieces by hand
 
@@ -156,13 +156,12 @@ and may export their home-state rates and fees under federal law; the engine
 reports what the statute says, and whether it applies to a given lender is the
 auditor's call.
 
-**Open encoding question, exposed by the new document.** N.Y. Banking Law § 351
-("default of more than ten days") is seeded with an 11-day minimum grace period,
-while Tex. Fin. Code § 342.203 ("after the 10th day") is seeded with 10. OneMain's
-"within 10 days after it is due" means the charge lands on day 11, which
-satisfies both statutes, so the New York finding on both OneMain forms is an
-artifact of the encoding. It is pinned in `test_onemain_texas_form_audit` so that
-changing it is a deliberate decision.
+**Grace-period encoding (settled 2026-09-06).** N.Y. Banking Law § 351
+("default of more than ten days") is seeded with a 10-day minimum, the same
+reading as Tex. Fin. Code § 342.203 ("after the 10th day"): ten full days must
+elapse before the charge. It was seeded at 11 until the OneMain Texas form, whose
+"within 10 days after it is due" charges on day 11, showed the inconsistency. The
+deterministic extractor already read the statute as 10.
 
 **Known engine limits on form-style agreements.** Checkbox semantics are not read
 (the Truth in Lending box's "[Z] I will not have to pay a penalty for prepaying"
